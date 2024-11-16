@@ -1,0 +1,59 @@
+pipeline {
+    agent any
+    triggers {
+        pollSCM '*/5 * * * *'
+    }
+    
+    tools{
+        maven '3.9.8'
+    }
+
+    stages {
+        
+        stage("cleaning workspace"){
+            steps{
+                cleanWs()
+                
+            }
+           
+        }
+        
+        stage('git cloning') {
+            steps {
+                git branch: 'main', url: 'https://github.com/builderHub/CICD-01.git'
+            }
+        }
+
+        stage('code stability'){
+            steps{
+                sh "mvn clean test"
+            }
+        }
+        
+        stage('code quality analysis'){
+            steps{
+                sh "mvn checkstyle:checkstyle"
+            }
+        }
+        
+        stage('code coverage analysis'){
+            steps{
+                sh 'mvn jacoco:report'
+            }
+        }
+        stage('generate report'){
+            steps{
+                publishHTML([allowMissing: false, alwaysLinkToLastBuild: false, keepAll: false, reportDir: 'target/site/jacoco', reportFiles: 'index.html', reportName: 'code coverage Report', reportTitles: '', useWrapperFileDirectly: true])
+                publishHTML([allowMissing: false, alwaysLinkToLastBuild: false, keepAll: false, reportDir: 'target/reports', reportFiles: 'checkstyle.html', reportName: 'checkstyle Report', reportTitles: '', useWrapperFileDirectly: true])
+            }
+        }
+    }
+    
+    post {
+        always {
+
+            slackSend channel: 'all-notify',
+            message: "Find Status of Pipeline:- ${currentBuild.currentResult} ${env.JOB_NAME} ${env.BUILD_NUMBER} ${BUILD_URL}"
+        }
+    }
+}
